@@ -126,6 +126,11 @@ local function InRound()
 		for _, v in pairs(hunters) do
 			v:Freeze( false )
 		end
+		for _, v in pairs( player.GetAll() ) do
+			v:PrintMessage( HUD_PRINTCENTER, "The Hunters have been released!" )
+			v:EmitSound("objhunt/iwillkillyou.wav", 100 )
+		end
+		--game.GetWorld( ):EmitSound("objhunt/iwillkillyou.wav", 100 )
 	end
 
 end
