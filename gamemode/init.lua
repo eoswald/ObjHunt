@@ -2,12 +2,9 @@ AddCSLuaFile( "cl_init.lua" )
 AddCSLuaFile( "shared.lua" )
 include( "shared.lua" )
 
-<<<<<<< HEAD
 resource.AddFile("sound/taunts/jihad.wav")
-resource.AddFile( "sound/objhunt/iwillkillyou.wav" )
+resource.AddFile( "sound/objhunt/iwillkillyou2.wav" )
 
-=======
->>>>>>> upstream/master
 function GM:PlayerInitialSpawn( ply )
 	ply:SetTeam( TEAM_SPECTATOR )
 	player_manager.SetPlayerClass( ply, "player_spectator" )
