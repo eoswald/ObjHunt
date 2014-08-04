@@ -119,7 +119,6 @@ local function InRound()
 			v:PrintMessage( HUD_PRINTCENTER, "The Hunters have been released!" )
 			v:EmitSound("objhunt/iwillkillyou2.wav", 100 )
 		end
-		--game.GetWorld( ):EmitSound("objhunt/iwillkillyou.wav", 100 )
 	end
 
 end
