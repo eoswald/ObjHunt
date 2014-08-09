@@ -29,6 +29,9 @@ OBJHUNT_POST_ROUND_TIME = 5
 -- How much time props have before hunters are released
 OBJHUNT_HIDE_TIME = 30
 
+-- Can players talk between teams or only amongst?
+DISABLE_GLOBAL_CHAT = true
+
 -- The minimum Z height that the props view will be set to
 VIEW_MIN_Z = 5
 
@@ -87,10 +90,14 @@ DEPLETED_COLOR = Color( 255, 0, 0, 150 )
 FULL_COLOR = Color( 0, 255, 0, 150 )
 ROUND_TIME_COLOR = Color( 85, 85, 85, 200 )
 TAUNT_BAR_COLOR = Color( 0, 255, 255, 150 )
+TEXT_COLOR = Color( 255, 255, 255, 255 )
 
 --[[============]]--
 --[[TAUNT CONFIG]]--
 --[[============]]--
+
+TAUNT_MAX_PITCH = 128
+TAUNT_MIN_PITCH = 64
 
 TAUNTS = {}
 -- USAGE:
