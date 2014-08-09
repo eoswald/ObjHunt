@@ -124,6 +124,7 @@ hook.Add( "Initialize", "Precache all network strings", function()
 	util.AddNetworkString( "Prop Angle Lock BROADCAST" )
 	util.AddNetworkString( "Prop Angle Snap" )
 	util.AddNetworkString( "Prop Angle Snap BROADCAST" )
+	util.AddNetworkString( "Hunter Release Sound" )
 end )
 
 --[[ Map Time ]]--
