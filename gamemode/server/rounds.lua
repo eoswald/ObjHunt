@@ -1,4 +1,4 @@
-	--[[ Rounds are handled here, obviously ]]--
+--[[ Rounds are handled here, obviously ]]--
 
 -----------------------------------
 -- THE HOOKS THAT THIS CALLS ARE --
@@ -7,11 +7,6 @@
 -- OBJHUNT_RoundEnd_Hunters      --
 -- OBJHUNT_RoundLimit            --
 -----------------------------------
-
-local ROUND_WAIT  = 0
-local ROUND_START = 1
-local ROUND_IN    = 2
-local ROUND_END   = 3
 
 -- this var is used outside of this file
 round = {}
@@ -57,7 +52,7 @@ end
 
 local function WaitRound()
 	-- wait for everyone to connect and what not
-	local mapTime = os.time() - mapStartTime
+	local mapTime = CurTime()
 	if( mapTime < OBJHUNT_PRE_ROUND_TIME ) then return end
 
 	-- make sure we have at least one player on each team
@@ -94,18 +89,18 @@ local function InRound()
 	local hunters = GetLivingPlayers(TEAM_HUNTERS)
 	local props = GetLivingPlayers(TEAM_PROPS)
 
-	if( #hunters == 0 ) then
-		round.state = ROUND_END
-		round.endTime = CurTime()
-		round.winner = "Props"
-		hook.Call( "OBJHUNT_RoundEnd" )
-		return
-	end
-
 	if( #props == 0 ) then
 		round.state = ROUND_END
 		round.endTime = CurTime()
 		round.winner = "Hunters"
+		hook.Call( "OBJHUNT_RoundEnd" )
+		return
+	end
+
+	if( #hunters == 0 ) then
+		round.state = ROUND_END
+		round.endTime = CurTime()
+		round.winner = "Props"
 		hook.Call( "OBJHUNT_RoundEnd" )
 		return
 	end

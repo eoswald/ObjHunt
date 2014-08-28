@@ -1,5 +1,11 @@
 include( "shared.lua" )
 
+local function KillTaunt( ply )
+	if( ply.tauntPatch && ply.tauntPatch:IsPlaying() ) then
+		ply.tauntPatch:Stop()
+	end
+end
+
 --[ Prop Updates ]--
 net.Receive( "Prop update", function( length )
 	-- set up the hitbox
@@ -29,6 +35,12 @@ net.Receive( "Prop update", function( length )
 end )
 
 net.Receive( "Reset Prop", function( length )
+	-- taunt default
+	LocalPlayer().nextTaunt = 0
+	LocalPlayer().lastTaunt = 0
+	LocalPlayer().lastTauntDuration = 1
+	LocalPlayer().lastTauntPitch = 100
+
 	LocalPlayer():ResetHull()
 	LocalPlayer().firstProp       = true
 	LocalPlayer().wantThirdPerson = false
@@ -88,6 +100,42 @@ net.Receive( "Clear Round State", function()
 	end
 end )
 
+net.Receive( "Taunt Selection", function()
+	local taunt = net.ReadString()
+	local pitch = net.ReadUInt( 8 )
+	local id = net.ReadUInt( 8 )
+	local ply = player.GetByID( id )
+
+	if( ply == LocalPlayer() ) then
+		ply.nextTaunt = CurTime() + ( SoundDuration( taunt ) * (100/pitch) )
+		ply.lastTaunt = CurTime()
+		ply.lastTauntPitch = pitch
+		ply.lastTauntDuration = SoundDuration( taunt ) * (100/pitch)
+	end
+
+	local s = Sound(taunt)
+
+	-- need to delete the gc function so my ents remain
+	ply.tauntPatch = CreateSound( ply, s )
+	if( ply.tauntPatch.__gc ) then
+		local smeta = getmetatable(ply.tauntPatch)
+		smeta.__gc = function()
+		end
+	end
+
+	ply.tauntPatch:SetSoundLevel( 100 )
+	ply.tauntPatch:PlayEx(1, pitch)
+
+	-- old not stoppable method
+	--EmitSound( taunt , ply:GetPos(), id, CHAN_AUTO, 1, 100, 2, pitch )
+end )
+
+net.Receive( "Player Death", function()
+	local id = net.ReadUInt( 8 )
+	local ply = player.GetByID( id )
+	KillTaunt( ply )
+end )
+
 -- disable default hud elements here
 function GM:HUDShouldDraw( name )
 	if ( name == "CHudHealth" or name == "CHudBattery" ) then
@@ -95,3 +143,4 @@ function GM:HUDShouldDraw( name )
 	end
 	return true
 end
+

@@ -9,7 +9,7 @@ function GetLivingPlayers( onTeam )
 	return livingPly
 end
 
--- now realised there is a flag to ignore ws...
+-- now realised there is a flag to ignore ws, don't use this it's not done....
 function isStuck( ply )
 	local pos = ply:GetPos()
 	local ws = game.GetWorld()
@@ -52,4 +52,13 @@ function WouldBeStuck( ply, prop )
 	end
 
 	return false
+end
+
+function LerpColor(frac,from,to)
+	return Color(
+		Lerp(frac,from.r,to.r),
+		Lerp(frac,from.g,to.g),
+		Lerp(frac,from.b,to.b),
+		Lerp(frac,from.a,to.a)
+	)
 end

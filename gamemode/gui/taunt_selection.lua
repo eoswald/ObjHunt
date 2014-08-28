@@ -4,24 +4,34 @@ local height = 200
 local btnWidth = width
 local btnHeight = 50
 local tauntPanel
+local pitchSlider
 
 local function playTaunt( taunt, pitch )
+	if( !LocalPlayer().nextTaunt ) then
+		LocalPlayer().nextTaunt = 0
+	end
+
 	-- only play if the last taunt has ended
 	if( CurTime() < LocalPlayer().nextTaunt ) then return end
+	if( !LocalPlayer():Alive() ) then return end
 
 	net.Start( "Taunt Selection" )
 		net.WriteString( taunt )
-		net.WriteUInt( pitch, 10 )
+		net.WriteUInt( pitch, 8 )
 	net.SendToServer()
 
-	LocalPlayer().nextTaunt = CurTime() + ( SoundDuration( taunt ) * (100/pitch) )
-	LocalPlayer().lastTaunt = CurTime()
-	LocalPlayer().lastTauntPitch = pitch
-	LocalPlayer().lastTauntDuration = SoundDuration( taunt ) * (100/pitch)
+	pitchSlider:SetValue( pitch )
 end
 
+
 local function tauntSelection()
-	if( LocalPlayer():Team() != TEAM_PROPS || !LocalPlayer():Alive() ) then return end
+	if( LocalPlayer():Team() != TEAM_PROPS && LocalPlayer():Team() != TEAM_HUNTERS || !LocalPlayer():Alive() ) then return end
+	local TAUNTS
+	if( LocalPlayer():Team() == TEAM_PROPS ) then
+		TAUNTS = PROP_TAUNTS
+	else
+		TAUNTS = HUNTER_TAUNTS
+	end
 
 
 	tauntPanel = vgui.Create( "DPanel" )
@@ -44,7 +54,7 @@ local function tauntSelection()
 			tauntPanel:Remove()
 		end
 
-	local pitchSlider = vgui.Create( "DNumSlider", prettyPanel )
+	pitchSlider = vgui.Create( "DNumSlider", prettyPanel )
 		pitchSlider:SetText( "Pitch" )
 		pitchSlider:SetMin( TAUNT_MIN_PITCH )
 		pitchSlider:SetMax( TAUNT_MAX_PITCH )
@@ -62,7 +72,6 @@ local function tauntSelection()
 			tauntList:AddLine( k, v )
 		end
 		tauntList.OnClickLine = function(parent, line, isSelected)
-			tauntPanel:SetVisible( false )
 			playTaunt( line:GetValue(2), pitchSlider:GetValue() )
 		end
 
@@ -71,7 +80,6 @@ local function tauntSelection()
 		randomBtn:SetSize( btnWidth, btnHeight )
 		randomBtn:SetPos( padding, height + padding*2 )
 		randomBtn.DoClick = function()
-			tauntPanel:SetVisible( false )
 			local pRange = TAUNT_MAX_PITCH - TAUNT_MIN_PITCH
 			playTaunt( table.Random( TAUNTS ), math.random()*pRange + TAUNT_MIN_PITCH )
 		end
@@ -104,8 +112,9 @@ local function tauntSelection()
 	end
 
 end
+
 hook.Add( "OnSpawnMenuOpen", "Display the taunt menu", function()
-	if( LocalPlayer():Team() != TEAM_PROPS || !LocalPlayer():Alive() ) then return end
+	if( LocalPlayer():Team() != TEAM_PROPS && LocalPlayer():Team() != TEAM_HUNTERS || !LocalPlayer():Alive() ) then return end
 	if( tauntPanel && tauntPanel:IsVisible() ) then
 		tauntPanel:SetVisible( false )
 	end
@@ -116,7 +125,8 @@ hook.Add( "OnSpawnMenuOpen", "Display the taunt menu", function()
 end )
 
 hook.Add( "OnSpawnMenuClose", "Close the context menu", function()
-	if( LocalPlayer():Team() != TEAM_PROPS || !LocalPlayer():Alive() ) then return end
+	if( LocalPlayer():Team() != TEAM_PROPS && LocalPlayer():Team() != TEAM_HUNTERS || !LocalPlayer():Alive() ) then return end
+	if( tauntPanel && !tauntPanel:IsVisible() ) then return end
 	tauntPanel:SetKeyboardInputEnabled( true )
 	tauntPanel:SetVisible( false )
 end )

@@ -8,14 +8,26 @@ resource.AddFile( "sound/objhunt/iwillkillyou2.wav" )
 function GM:PlayerInitialSpawn( ply )
 	ply:SetTeam( TEAM_SPECTATOR )
 	player_manager.SetPlayerClass( ply, "player_spectator" )
-end
-
--- [[ Class Selection ]] --
-function GM:ShowHelp( ply ) -- This hook is called everytime F1 is pressed.
+	ply:SetCustomCollisionCheck( true )
+	ply.nextTaunt = 0
 	net.Start( "Class Selection" )
 		-- Just used as a hook
 	net.Send( ply )
 end
+
+-- [[ Class Selection ]] --
+function GM:ShowTeam( ply ) -- This hook is called everytime F1 is pressed.
+	net.Start( "Class Selection" )
+		-- Just used as a hook
+	net.Send( ply )
+end
+
+function GM:ShowHelp( ply )
+	net.Start( "Help" )
+		-- Just used as a hook
+	net.Send( ply )
+end
+
 
 net.Receive("Class Selection", function( len, ply )
 	local chosen = net.ReadUInt(32)
@@ -48,16 +60,42 @@ net.Receive("Class Selection", function( len, ply )
 
 	RemovePlayerProp( ply )
 	ply:KillSilent()
-	ply:Spawn()
 end )
 
 -- [[ Taunts ]] --
+function SendTaunt( ply, taunt, pitch )
+	if( CurTime() < ply.nextTaunt ) then return end
+	if( !ply:Alive() ) then return end
+	if( ply:Team() == TEAM_PROPS && !table.HasValue( PROP_TAUNTS, taunt ) ) then return end
+	if( ply:Team() == TEAM_HUNTERS && !table.HasValue( HUNTER_TAUNTS, taunt ) ) then return end
+
+	ply.nextTaunt = CurTime() + ( SoundDuration( taunt ) * (100/pitch) )
+
+	net.Start( "Taunt Selection" )
+		net.WriteString( taunt )
+		net.WriteUInt( pitch, 8 )
+		net.WriteUInt( ply:EntIndex(), 8 )
+	net.Broadcast()
+end
+
+function GM:ShowSpare1( ply )
+	local TAUNTS
+	if( ply:Team() == TEAM_PROPS ) then
+		TAUNTS = PROP_TAUNTS
+	else
+		TAUNTS = HUNTER_TAUNTS
+	end
+
+	local pRange = TAUNT_MAX_PITCH - TAUNT_MIN_PITCH
+	local taunt = table.Random( TAUNTS )
+	local pitch = math.random()*pRange + TAUNT_MIN_PITCH
+	SendTaunt( ply, taunt, pitch )
+end
+
 net.Receive( "Taunt Selection", function( len, ply )
 	local taunt = net.ReadString()
-	local pitch = net.ReadUInt( 10 )
-	-- random pitch sounds == lol
-	-- ply:EmitSound( taunt, 70, math.random()*255 )
-	ply:EmitSound( taunt, 70, pitch )
+	local pitch = net.ReadUInt( 8 )
+	SendTaunt( ply, taunt, pitch )
 end )
 
 
@@ -84,6 +122,17 @@ function GM:PlayerShouldTakeDamage( victim, attacker )
 	return false
 end
 
+local function BroadcastPlayerDeath( ply )
+	net.Start( "Player Death" )
+		-- the player who died, so sad, too bad.
+		net.WriteUInt( ply:EntIndex(), 8 )
+	net.Broadcast()
+	-- remove ragdoll
+	local ragdoll = ply:GetRagdollEntity()
+	SafeRemoveEntityDelayed( ragdoll, 5 )
+end
+
+
 -- how damage to props is handled
 local function HurtProp( ply, dmg, attacker )
 	if( attacker:Alive() ) then
@@ -96,7 +145,9 @@ local function HurtProp( ply, dmg, attacker )
 	ply:SetHealth( ply:Health() - dmg )
 	if( ply:Health() < 1 && ply:Alive() ) then
 		ply:KillSilent()
+		ply:CreateRagdoll( )
 		RemovePlayerProp( ply )
+		BroadcastPlayerDeath( ply )
 		net.Start( "Death Notice" )
 			net.WriteString( attacker:Nick() )
 			net.WriteUInt( attacker:Team(), 16 )
@@ -105,6 +156,7 @@ local function HurtProp( ply, dmg, attacker )
 			net.WriteUInt( ply:Team(), 16 )
 		net.Broadcast()
 		attacker:AddFrags( 1 )
+		ply:AddDeaths( 1 )
 	end
 end
 
@@ -112,6 +164,7 @@ end
 local function DamageHandler( target, dmgInfo )
 
 	local attacker = dmgInfo:GetAttacker()
+	-- dynamic damage
 	local dmg = dmgInfo:GetDamage()
 
 	if( attacker:IsPlayer() ) then
@@ -122,13 +175,17 @@ local function DamageHandler( target, dmgInfo )
 				-- disable stepping on bottles to hurt
 				local dmgType = dmgInfo:GetDamageType()
 				if( dmgType == DMG_CRUSH ) then return end
+				-- static damage
+				if( HUNTER_DAMAGE_PENALTY > 0 ) then
+					dmg = HUNTER_DAMAGE_PENALTY
+				end
 
 				attacker:SetHealth( attacker:Health() - dmg )
 				if( attacker:Health() < 1 ) then
 					attacker:Kill()
 					-- default suicide notice
 				end
-			elseif( target:GetOwner():IsPlayer() ) then
+			elseif( target:GetOwner():IsPlayer() && target:GetOwner():Team() == TEAM_PROPS ) then
 				local ply = target:GetOwner()
 				HurtProp( ply, dmg, attacker )
 			elseif( target:IsPlayer() && target:Team() == TEAM_PROPS ) then
@@ -149,8 +206,9 @@ hook.Add( "Initialize", "Precache all network strings", function()
 	util.AddNetworkString( "Death Notice" )
 	util.AddNetworkString( "Class Selection" )
 	util.AddNetworkString( "Taunt Selection" )
-	util.AddNetworkString( "Map Time" )
+	util.AddNetworkString( "Help" )
 	util.AddNetworkString( "Round Update" )
+	util.AddNetworkString( "Player Death" )
 	util.AddNetworkString( "Prop Update" )
 	util.AddNetworkString( "Reset Prop" )
 	util.AddNetworkString( "Selected Prop" )
@@ -166,12 +224,25 @@ hook.Add( "Initialize", "Set Map Time", function()
 	mapStartTime = os.time()
 end )
 
-hook.Add( "PlayerInitialSpawn", "Send Map Time To New Player", function( ply )
-	local toSend = ( mapStartTime || os.time() )
-	net.Start( "Map Time" )
-		net.WriteUInt( toSend, 32 )
-	net.Send( ply )
-end )
+--[[ Door Exploit fix ]]--
+function GM:PlayerUse( ply, ent )
+	-- default value
+	if( !ply.lastDoorTrigger ) then
+		ply.lastDoorTrigger = CurTime()
+		ply.nextDoorTrigger = CurTime() + ( 0.5 + math.random() )
+		return true
+	end
+
+	if( table.HasValue( DOORS, ent:GetClass() ) && CurTime() < ply.nextDoorTrigger ) then
+		return false
+	else
+		ply.lastDoorTrigger = CurTime()
+		ply.nextDoorTrigger = CurTime() + ( 0.5 + math.random() )
+		return true
+	end
+
+
+end
 
 --[[ sets the players prop, run PlayerCanBeEnt before using this ]]--
 function SetPlayerProp( ply, ent, scale, hbMin, hbMax )
@@ -191,8 +262,8 @@ function SetPlayerProp( ply, ent, scale, hbMin, hbMax )
 
 	ply:GetProp():SetModel( ent:GetModel() )
 	ply:GetProp():SetSkin( ent:GetSkin() )
-	ply:GetProp():SetSolid( SOLID_VPHYSICS )
 	ply:GetProp():SetAngles( ply:GetAngles() )
+	ply:GetProp():SetSolid( SOLID_VPHYSICS )
 
 	-- we round to reduce getting stuck
 	tHitboxMin = Vector( math.Round(tHitboxMin.x),math.Round(tHitboxMin.y),math.Round(tHitboxMin.z) )
@@ -261,7 +332,6 @@ end )
 
 --[[ When a player on team_props spawns ]]--
 hook.Add( "PlayerSpawn", "Set ObjHunt model", function ( ply )
-	--ply:SetCollisionGroup( COLLISION_GROUP_IN_VEHICLE )
 	-- default prop should be able to step wherever
 	ply:SetStepSize( 20 )
 	ply:SetNotSolid( false )
@@ -327,9 +397,10 @@ hook.Add( "PlayerDisconnected", "Remove ent prop on dc", function( ply )
 end )
 
 hook.Add( "PlayerDeath", "Remove ent prop on death", function( ply )
+	BroadcastPlayerDeath( ply )
+
+	ply.nextTaunt = 0
 	RemovePlayerProp( ply )
-	local ragdoll = ply:GetRagdollEntity()
-	SafeRemoveEntityDelayed( ragdoll, 5 )
 	if( ply:IsFrozen() ) then
 		ply:Freeze( false )
 	end
@@ -367,5 +438,10 @@ function GM:PlayerCanSeePlayersChat( text, teamOnly, listener, speaker )
 		end
 	end
 
+	return true
+end
+
+function GM:PlayerCanPickupWeapon(ply, wep)
+	if( ply:Team() == TEAM_PROPS ) then return false end
 	return true
 end

@@ -58,6 +58,9 @@ local function stencilColor( ply, ent )
 	if( ent:IsPlayer() ) then return false end
 	if( ent:GetOwner():IsPlayer() ) then return false end
 
+	-- can't be a banned prop
+	if( table.HasValue( BANNED_PROPS, ent:GetModel() ) ) then return end
+
 	-- must have a bounding box
 	if( !ent:GetHitBoxBounds(0,0) ) then return false end
 
